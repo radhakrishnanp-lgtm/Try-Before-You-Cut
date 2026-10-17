@@ -94,6 +94,8 @@ export const supabaseStore: Store = {
     many<TryOnSession>("sessions", (q) => q.select().eq("salon_id", salonId).order("created_at", { ascending: false }).limit(limit)),
   listExpiredSessions: (at, limit) =>
     many<TryOnSession>("sessions", (q) => q.select().is("deleted_at", null).lt("expires_at", at.toISOString()).limit(limit)),
+  listPendingRemoteCleanup: (limit) =>
+    many<TryOnSession>("sessions", (q) => q.select().not("deleted_at", "is", null).not("provider_state", "is", null).limit(limit)),
   async createConsent(input) {
     return (await one<Consent>("consents", (q) => q.insert(toRow(input)).select().single()))!;
   },

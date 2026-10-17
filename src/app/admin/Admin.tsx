@@ -6,7 +6,7 @@ import type { UsageStats } from "@/lib/store/types";
 import { PLANS, type PlanId, type Salon, type Style } from "@/lib/types";
 
 interface Row { salon: Salon; usage: UsageStats; owners: string[] }
-const TABS = ["Salons", "New salon", "Catalogue"] as const;
+const TABS = ["Salons", "New salon", "Catalogue", "Connections"] as const;
 // Rough cost guide at ~$0.04/image and ~Rs 85/$ (identity retries add to this).
 const INR_PER_IMAGE = 3.4;
 
@@ -80,7 +80,59 @@ export function Admin({ rows: initial, styles: initialStyles, health }: { rows: 
       {tab === "New salon" && <NewSalon onCreated={(s) => { setRows([...rows, { salon: s, usage: { sessions: 0, tryOns: 0, failed: 0, sharedSessions: 0, shareEvents: 0 }, owners: [] }]); setTab("Salons"); flash(true, `${s.name} created. The owner can sign in now.`); }} flash={flash} />}
 
       {tab === "Catalogue" && <Catalogue styles={styles} setStyles={setStyles} flash={flash} />}
+
+      {tab === "Connections" && <Connections />}
     </main>
+  );
+}
+
+type Step = "llm" | "vision" | "magnific" | "magnific_image" | "pipeline";
+const STEPS: { step: Step; label: string; note?: string }[] = [
+  { step: "llm", label: "LLM answers", note: "OpenAI-compatible API (OpenRouter by default)" },
+  { step: "vision", label: "LLM sees images", note: "Used for photo and identity checks when no face service is set" },
+  { step: "magnific", label: "Magnific connected", note: "MCP sign-in and image model available (free)" },
+  { step: "magnific_image", label: "Magnific test image", note: "Uses a few Magnific credits" },
+  { step: "pipeline", label: "Try-on pipeline", note: "Provider order and identity check in use" },
+];
+
+function Connections() {
+  const [results, setResults] = useState<Partial<Record<Step, { ok: boolean; detail: string; ms: number } | "running">>>({});
+  async function run(step: Step) {
+    setResults((r) => ({ ...r, [step]: "running" }));
+    try {
+      const res = await api<{ ok: boolean; detail: string; ms: number }>("/api/admin/check", { method: "POST", json: { step } });
+      setResults((r) => ({ ...r, [step]: res }));
+    } catch (e) {
+      setResults((r) => ({ ...r, [step]: { ok: false, detail: (e as Error).message, ms: 0 } }));
+    }
+  }
+  return (
+    <div className="card stack">
+      <div className="spread">
+        <h3 style={{ margin: 0 }}>Check connections</h3>
+        <button className="btn btn-accent btn-sm" onClick={() => STEPS.filter((s) => s.step !== "magnific_image").forEach((s) => void run(s.step))}>Run free checks</button>
+      </div>
+      <div className="table-wrap">
+        <table className="table">
+          <tbody>
+            {STEPS.map((s) => {
+              const r = results[s.step];
+              return (
+                <tr key={s.step}>
+                  <td><strong>{s.label}</strong><div className="small muted">{s.note}</div></td>
+                  <td style={{ width: "50%" }}>
+                    {r === "running" ? <span className="small muted">Checking…</span> : r ? (
+                      <span className="small"><span className={`badge ${r.ok ? "badge-ok" : "badge-bad"}`}>{r.ok ? "OK" : "Problem"}</span> {r.detail} <span className="muted">({(r.ms / 1000).toFixed(1)} s)</span></span>
+                    ) : null}
+                  </td>
+                  <td style={{ textAlign: "right" }}><button className="btn btn-ghost btn-sm" disabled={r === "running"} onClick={() => run(s.step)}>Check</button></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 

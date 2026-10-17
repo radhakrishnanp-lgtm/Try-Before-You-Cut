@@ -102,7 +102,7 @@ export const memoryStore: Store = {
 
   async createSession(input) {
     const s: TryOnSession = {
-      ...input, id: randomUUID(), photoKey: null, photoEmbedding: null, stylistNote: null,
+      ...input, id: randomUUID(), photoKey: null, photoEmbedding: null, providerState: null, stylistNote: null,
       chosenResultIds: [], shareToken: null, rounds: 0, createdAt: now(), deletedAt: null,
     };
     db.sessions.set(s.id, s);
@@ -121,6 +121,9 @@ export const memoryStore: Store = {
   },
   async listExpiredSessions(at, limit) {
     return [...db.sessions.values()].filter((s) => !s.deletedAt && new Date(s.expiresAt) < at).slice(0, limit);
+  },
+  async listPendingRemoteCleanup(limit) {
+    return [...db.sessions.values()].filter((s) => s.deletedAt && s.providerState).slice(0, limit);
   },
   async createConsent(input) {
     const { ipHash: _ip, ...rest } = input;

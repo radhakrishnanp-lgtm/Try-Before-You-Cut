@@ -1,10 +1,10 @@
-import { editImage, usingMockAi } from "./ai";
+import { cleanupProviders, editImage, prepareProviders, usingMockAi } from "./ai";
 import { buildHairPrompt } from "./ai/prompt";
 import { HttpError } from "./auth";
 import { getPrivate, putPrivate, removePrivate, signedUrl } from "./blob";
 import { CONSENT_VERSION, MAX_ROUNDS_PER_SESSION, MAX_STYLES_PER_ROUND, RETENTION_HOURS } from "./config";
 import { keyedHash, randomToken, sha256 } from "./crypto";
-import { compareIdentity, usingMockIdentity, verifier } from "./identity";
+import { usingMockIdentity, verifier } from "./identity";
 import { sniffImage } from "./image-meta";
 import { consentText } from "./legal";
 import { store } from "./store";
@@ -61,7 +61,7 @@ export async function savePhoto(session: TryOnSession, bytes: Uint8Array, actor:
   }
   let face;
   try {
-    face = await verifier().analyse(bytes, meta.mime);
+    face = await verifier().checkPhoto({ bytes, mimeType: meta.mime });
   } catch (err) {
     console.error("face analysis unavailable", err instanceof Error ? err.message : err);
     throw new HttpError(503, "Our photo check is temporarily unavailable. Please try again in a minute.");
@@ -69,6 +69,7 @@ export async function savePhoto(session: TryOnSession, bytes: Uint8Array, actor:
   if (face.faceCount === 0) throw new HttpError(422, "We couldn't find a face. Face the camera in good light, with your whole head in the frame.");
   if (face.faceCount > 1) throw new HttpError(422, "We found more than one face. Please make sure only you are in the photo.");
   if (face.faceWidthRatio !== null && face.faceWidthRatio < 0.12) throw new HttpError(422, "Your face is too small in the photo. Move a little closer.");
+  if (face.problems?.length) console.info("photo check notes", face.problems);
 
   if (session.photoKey) {
     // Retake: replace the photo and drop results made from the old one.
@@ -80,7 +81,11 @@ export async function savePhoto(session: TryOnSession, bytes: Uint8Array, actor:
   const key = `${session.salonId}/${session.id}/photo-${randomToken(6)}.${meta.mime.split("/")[1]}`;
   await putPrivate(key, bytes, meta.mime);
   await store.logAccess({ salonId: session.salonId, sessionId: session.id, actor, action: "photo.uploaded" });
-  return store.updateSession(session.id, { photoKey: key, photoEmbedding: face.embedding });
+  // A new photo must be re-uploaded to providers; keep their folders for cleanup.
+  const providerState = session.providerState?.magnific
+    ? { ...session.providerState, magnific: { folder: session.providerState.magnific.folder } }
+    : session.providerState;
+  return store.updateSession(session.id, { photoKey: key, photoEmbedding: face.embedding, providerState });
 }
 
 export async function startRound(session: TryOnSession, styleIds: string[], actor: string): Promise<Result[]> {
@@ -94,6 +99,14 @@ export async function startRound(session: TryOnSession, styleIds: string[], acto
   if (!salon) throw new HttpError(404, "Salon not found");
   const allowed = new Set((await stylesForSalon(salon)).map((s) => s.id));
   if (!ids.every((id) => allowed.has(id))) throw new HttpError(400, "One of those styles isn't available at this salon.");
+
+  // Upload the photo to providers that keep remote state (Magnific), once per photo.
+  if (!session.providerState?.magnific?.photo) {
+    const photo = await getPrivate(session.photoKey);
+    if (!photo) throw new HttpError(410, "Your photo is no longer available. Please retake it.");
+    const providerState = await prepareProviders({ id: session.id, state: session.providerState ?? {} }, { bytes: photo.bytes, mimeType: photo.mime });
+    if (Object.keys(providerState).length) await store.updateSession(session.id, { providerState });
+  }
 
   if (!(await store.reserveCredits(salon.id, ids.length))) {
     throw new HttpError(402, "This salon has used all of its try-ons for this period. Please ask the salon team.");
@@ -121,25 +134,30 @@ export async function runResult(result: Result, session: TryOnSession, texture: 
   if (!style || !photo) return fail("The photo or style is no longer available.", 0);
 
   let lastSimilarity: number | null = null;
+  let lastReason: string | undefined;
   for (let attempt = 1; attempt <= MAX_IDENTITY_ATTEMPTS; attempt++) {
     let edited;
     try {
       edited = await editImage({
         image: { bytes: photo.bytes, mimeType: photo.mime },
         prompt: buildHairPrompt({ stylePrompt: style.prompt, texture, strict: attempt > 1 }),
+        session: { id: session.id, state: session.providerState ?? {} },
       });
     } catch (err) {
       console.error("generation failed", result.id, err instanceof Error ? err.message : err);
       return fail("We couldn't create this look right now. Your try-on credit was returned.", attempt);
     }
 
-    const analysis = await Promise.resolve().then(() => verifier().analyse(edited.bytes, edited.mimeType)).catch((err) => {
-      console.error("identity check failed", err);
-      return null;
-    });
-    if (!analysis) return fail("We couldn't verify this result, so we didn't show it. Your credit was returned.", attempt);
-    const verdict = compareIdentity(session.photoEmbedding, analysis);
+    const original = { photo: { bytes: photo.bytes, mimeType: photo.mime }, embedding: session.photoEmbedding };
+    const verdict = await Promise.resolve()
+      .then(() => verifier().compare(original, { bytes: edited.bytes, mimeType: edited.mimeType }, style.name))
+      .catch((err) => {
+        console.error("identity check failed", err);
+        return null;
+      });
+    if (!verdict) return fail("We couldn't verify this result, so we didn't show it. Your credit was returned.", attempt);
     lastSimilarity = verdict.similarity;
+    lastReason = verdict.reason;
     if (verdict.passed) {
       const ext = edited.mimeType.includes("png") ? "png" : edited.mimeType.includes("webp") ? "webp" : "jpg";
       const key = `${session.salonId}/${session.id}/result-${result.id}.${ext}`;
@@ -149,10 +167,15 @@ export async function runResult(result: Result, session: TryOnSession, texture: 
         attempts: attempt, error: null, completedAt: new Date().toISOString(),
       });
     }
-    console.warn(`identity drift on ${result.id} attempt ${attempt}: ${verdict.similarity}`);
+    console.warn(`identity check failed on ${result.id} attempt ${attempt}: ${verdict.reason} (${verdict.similarity})`);
   }
   await store.updateResult(result.id, { similarity: lastSimilarity });
-  return fail("This look changed your face too much, so we didn't show it. Try another style. Your credit was returned.", MAX_IDENTITY_ATTEMPTS);
+  return fail(
+    lastReason === "style not applied"
+      ? "The AI didn't manage this style on your photo, so we didn't show it. Try another style. Your credit was returned."
+      : "This look changed your face too much, so we didn't show it. Try another style. Your credit was returned.",
+    MAX_IDENTITY_ATTEMPTS,
+  );
 }
 
 export interface SessionView {
@@ -201,4 +224,23 @@ export async function eraseSession(session: TryOnSession, actor: string, reason:
   });
   if (reason === "user") await store.withdrawConsent(session.id);
   await store.logAccess({ salonId: session.salonId, sessionId: session.id, actor, action: reason === "user" ? "data.deleted_by_request" : "data.expired" });
+  await eraseRemoteCopies({ ...session, deletedAt: new Date().toISOString() });
+}
+
+/**
+ * Delete provider copies (Magnific folder). On failure the state is kept and
+ * the hourly cleanup retries, so a provider outage never blocks local erasure.
+ */
+export async function eraseRemoteCopies(session: TryOnSession): Promise<boolean> {
+  if (!session.providerState) return true;
+  try {
+    await cleanupProviders(session.providerState);
+    await store.updateSession(session.id, { providerState: null });
+    await store.logAccess({ salonId: session.salonId, sessionId: session.id, actor: "system", action: "remote.deleted" });
+    return true;
+  } catch (err) {
+    console.error("remote cleanup failed", session.id, err instanceof Error ? err.message : err);
+    await store.logAccess({ salonId: session.salonId, sessionId: session.id, actor: "system", action: "remote.delete_failed" });
+    return false;
+  }
 }

@@ -1,5 +1,5 @@
 import { ACCESS_LOG_RETENTION_DAYS } from "./config";
-import { eraseSession } from "./sessions";
+import { eraseRemoteCopies, eraseSession } from "./sessions";
 import { store } from "./store";
 
 export async function runCleanup() {
@@ -19,6 +19,11 @@ export async function runCleanup() {
     }
     if (failures.length) break;
   }
+  // Retry provider deletions that failed earlier.
+  let remoteRetried = 0;
+  for (const s of await store.listPendingRemoteCleanup(50)) {
+    if (await eraseRemoteCopies(s)) remoteRetried++;
+  }
   const logsPurged = await store.purgeAccessLogs(new Date(Date.now() - ACCESS_LOG_RETENTION_DAYS * 86400_000));
-  return { erased, failures, logsPurged };
+  return { erased, failures, remoteRetried, logsPurged };
 }

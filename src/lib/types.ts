@@ -76,6 +76,8 @@ export interface TryOnSession {
   tokenHash: string;
   photoKey: string | null;
   photoEmbedding: number[] | null;
+  /** Remote copies held by image providers (e.g. Magnific folder); erased with the session. */
+  providerState: import("./ai/types").ProviderState | null;
   stylistNote: string | null;
   chosenResultIds: string[];
   shareToken: string | null;

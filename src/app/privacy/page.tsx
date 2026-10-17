@@ -20,7 +20,7 @@ export default function Privacy() {
         <h2>What we collect</h2>
         <ul>
           <li>The photo you take or upload, and the hairstyle previews created from it.</li>
-          <li>A mathematical face template (embedding) used only to check that previews still look like you. It is deleted with your photo.</li>
+          <li>If our face-check service is used: a mathematical face template (embedding), used only to check that previews still look like you. It is deleted with your photo.</li>
           <li>A record that you consented: time, notice version, whether a guardian consented, and a one-way hash of your IP address.</li>
           <li>An optional note your stylist adds to your Stylist Board.</li>
         </ul>
@@ -33,7 +33,12 @@ export default function Privacy() {
         <p>Your photo, the previews, the face template and the stylist note are <strong>deleted automatically {RETENTION_HOURS} hours</strong> after your session starts. Any share link stops working at the same time. The consent record and an access log (which contain no images) are kept for one year so we can show the law was followed.</p>
 
         <h2>Who processes it</h2>
-        <p>Images are stored in private, encrypted storage (Supabase) and sent over an encrypted connection to an AI image-editing provider (Google Gemini, or Black Forest Labs FLUX via Replicate as a fallback) and to our face-check service. These providers process the image to return the result and are not permitted to use it for training under the paid API terms we use.</p>
+        <p>Images are stored in private, encrypted storage (Supabase) and sent over encrypted connections to:</p>
+        <ul>
+          <li><strong>Magnific (Freepik)</strong>, which edits the hairstyle. Your photo and previews are kept in a private folder created only for your session, and that folder is deleted when your data is deleted. If Magnific is unavailable, Google Gemini or Black Forest Labs FLUX (via Replicate) may be used instead.</li>
+          <li><strong>An AI vision model</strong> (via OpenRouter), which checks that your photo shows one face and that each preview still looks like you. It receives the images only for that check. Where our own face-check service is deployed, it does this instead.</li>
+        </ul>
+        <p>These providers process images only to return a result, under paid API terms that do not allow training on them.</p>
 
         <h2>Children</h2>
         <p>For anyone under 18, a parent or legal guardian must give consent on the consent screen.</p>

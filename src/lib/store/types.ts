@@ -39,6 +39,8 @@ export interface Store {
   updateSession(id: string, patch: Partial<Omit<TryOnSession, "id">>): Promise<TryOnSession>;
   listRecentSessions(salonId: string, limit: number): Promise<TryOnSession[]>;
   listExpiredSessions(now: Date, limit: number): Promise<TryOnSession[]>;
+  /** Erased sessions whose provider copies (Magnific) still need deleting. */
+  listPendingRemoteCleanup(limit: number): Promise<TryOnSession[]>;
   createConsent(input: Omit<Consent, "id" | "grantedAt" | "withdrawnAt"> & { ipHash: string | null }): Promise<Consent>;
   withdrawConsent(sessionId: string): Promise<void>;
 

@@ -1,10 +1,12 @@
 import { config, isDemo } from "../config.ts";
 import { fluxProvider } from "./flux.ts";
 import { geminiProvider } from "./gemini.ts";
+import { magnificProvider } from "./magnific";
 import { mockProvider } from "./mock.ts";
-import { ProviderError, type ImageEditProvider, type ImageEditRequest, type ImageEditResult } from "./types.ts";
+import { ProviderError, type ImageEditProvider, type ImageEditRequest, type ImageEditResult, type ImageInput, type ProviderSession, type ProviderState } from "./types.ts";
 
 const REGISTRY: Record<string, ImageEditProvider> = {
+  magnific: magnificProvider,
   gemini: geminiProvider,
   flux: fluxProvider,
   mock: mockProvider,
@@ -36,4 +38,31 @@ export async function editImage(req: ImageEditRequest, opts: { skip?: string[]; 
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+/**
+ * Let providers that keep remote state (Magnific) set up the session before a
+ * round. A provider that fails to prepare refuses to edit, so the chain
+ * falls through to the next provider.
+ */
+export async function prepareProviders(session: ProviderSession, image: ImageInput): Promise<ProviderState> {
+  const state: ProviderState = { ...session.state };
+  for (const p of providerChain()) {
+    if (!p.prepare) continue;
+    try {
+      const slice = await p.prepare({ ...session, state }, image);
+      (state as Record<string, unknown>)[p.name] = slice;
+    } catch (err) {
+      console.warn(`provider ${p.name} prepare failed`, err instanceof Error ? err.message : err);
+    }
+  }
+  return state;
+}
+
+/** Remove remote copies for every provider that has state. Throws if any fails. */
+export async function cleanupProviders(state: ProviderState | null): Promise<void> {
+  if (!state) return;
+  for (const p of Object.values(REGISTRY)) {
+    if (p.cleanup && (state as Record<string, unknown>)[p.name]) await p.cleanup(state);
+  }
 }
