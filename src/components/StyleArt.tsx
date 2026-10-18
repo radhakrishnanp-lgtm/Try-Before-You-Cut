@@ -31,9 +31,11 @@ export function StyleArt({ art, texture, title }: { art: Art; texture?: Texture;
   const bottom = LENGTH_Y[art.sides];
   const w = BACK_W[art.sides];
   const long = bottom > 0;
-  const hair = "var(--ink-2, #2b2926)";
-  const skin = "#fbf6ee";
-  const line = "var(--brass, #b08d57)";
+  // Unique gradient id per thumbnail so many can share a page.
+  const gid = `hair-${art.sides}-${art.fringe}-${art.extra ?? "x"}-${Math.round(art.top * 100)}-${texture ?? "n"}`;
+  const hair = `url(#${gid})`;
+  const skin = "var(--art-skin, #1e1b18)";
+  const line = "var(--art-line, #d6ab63)";
 
   const cap = `M37 62 C35 ${crownY + 18} 46 ${crownY} ${CX} ${crownY} C74 ${crownY} 85 ${crownY + 18} 83 62 ${hairline(art.fringe)} Z`;
   const back = long
@@ -50,10 +52,16 @@ export function StyleArt({ art, texture, title }: { art: Art; texture?: Texture;
 
   return (
     <svg viewBox="0 0 120 140" role="img" aria-label={title ?? "Hairstyle illustration"}>
-      <path d="M16 140 C20 117 40 110 52 106 L68 106 C80 110 100 117 104 140 Z" fill="var(--paper-2, #efe7da)" stroke={line} strokeWidth="1.2" />
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0.4" y2="1">
+          <stop offset="0" stopColor="var(--art-hair-1, #f1d39a)" />
+          <stop offset="1" stopColor="var(--art-hair-2, #a47a3c)" />
+        </linearGradient>
+      </defs>
+      <path d="M16 140 C20 117 40 110 52 106 L68 106 C80 110 100 117 104 140 Z" fill="var(--art-body, #24201c)" stroke={line} strokeWidth="1.2" />
       {back && <path d={back} fill={hair} />}
       {back && waves && (
-        <g fill="none" stroke="#5a554d" strokeWidth="1.1" opacity="0.8">
+        <g fill="none" stroke="#6b4f27" strokeWidth="1.1" opacity="0.8">
           <path d={`M${CX - w + 5} 80 q4 8 0 16 t0 16`} />
           <path d={`M${CX + w - 5} 80 q-4 8 0 16 t0 16`} />
         </g>
@@ -102,7 +110,7 @@ export function StyleArt({ art, texture, title }: { art: Art; texture?: Texture;
         </g>
       )}
       {art.fringe === "swept-back" && (
-        <g fill="none" stroke="#5a554d" strokeWidth="1" opacity="0.9">
+        <g fill="none" stroke="#6b4f27" strokeWidth="1" opacity="0.9">
           <path d={`M50 50 Q52 ${crownY + 8} 58 ${crownY + 3}`} />
           <path d={`M60 48 Q62 ${crownY + 8} 68 ${crownY + 4}`} />
         </g>

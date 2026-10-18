@@ -1,33 +1,38 @@
 import { z } from "zod";
 import { HttpError, requireAdmin } from "@/lib/auth";
+import { config } from "@/lib/config";
 import { handler, json } from "@/lib/http";
+import { hashPassword } from "@/lib/password";
 import { store } from "@/lib/store";
-import { PLANS } from "@/lib/types";
+import { Password } from "@/lib/validation";
 
 const Patch = z.object({
-  plan: z.enum(["pilot", "starter", "pro", "chain"]).optional(),
   active: z.boolean().optional(),
-  addCredits: z.number().int().min(-10000).max(100000).optional(),
-  resetPeriod: z.boolean().optional(),
+  /** Add (or remove, if negative) photos; converted to credits. */
+  addPhotos: z.number().int().min(-100000).max(100000).optional(),
+  /** Add raw credits, for odd amounts. */
+  addCredits: z.number().int().min(-1000000).max(1000000).optional(),
+  /** Reset an owner's password. */
+  resetPassword: z.object({ memberId: z.string(), password: Password }).optional(),
 });
 
-/** Plan changes, credit top-ups and starting a new billing period. */
 export const PATCH = handler(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
-  const admin = await requireAdmin();
+  await requireAdmin();
   const { id } = await params;
-  const salon = await store.getSalon(id);
+  let salon = await store.getSalon(id);
   if (!salon) throw new HttpError(404, "Salon not found");
   const body = Patch.parse(await req.json());
-  const patch: Parameters<typeof store.updateSalon>[1] = {};
-  if (body.plan) patch.plan = body.plan;
-  if (body.active !== undefined) patch.active = body.active;
-  if (body.resetPeriod) {
-    patch.creditsUsed = 0;
-    patch.creditsTotal = PLANS[body.plan ?? salon.plan].tryOns;
-    patch.periodStart = new Date().toISOString();
+  const delta = (body.addPhotos ?? 0) * config.creditsPerImage + (body.addCredits ?? 0);
+  if (delta) {
+    salon = await store.adjustCredits(id, delta);
+    await store.logAccess({ salonId: id, sessionId: null, actor: "admin", action: `credits.adjusted:${delta}` });
   }
-  if (body.addCredits) patch.creditsTotal = Math.max(0, (patch.creditsTotal ?? salon.creditsTotal) + body.addCredits);
-  const updated = await store.updateSalon(id, patch);
-  await store.logAccess({ salonId: id, sessionId: null, actor: `admin:${admin.email}`, action: `salon.updated:${Object.keys(patch).join(",")}` });
-  return json({ salon: updated });
+  if (body.active !== undefined) salon = await store.updateSalon(id, { active: body.active });
+  if (body.resetPassword) {
+    const target = (await store.listMembers(id)).find((m) => m.id === body.resetPassword!.memberId);
+    if (!target) throw new HttpError(404, "Member not found");
+    await store.setMemberPassword(target.id, await hashPassword(body.resetPassword.password));
+    await store.logAccess({ salonId: id, sessionId: null, actor: "admin", action: `password.reset:${target.username}` });
+  }
+  return json({ salon });
 });

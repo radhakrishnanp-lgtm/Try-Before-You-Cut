@@ -54,3 +54,15 @@ test("sniffImage reads PNG and JPEG dimensions and rejects junk", () => {
   assert.deepEqual(sniffImage(jpeg), { mime: "image/jpeg", width: 640, height: 480 });
   assert.equal(sniffImage(new TextEncoder().encode("<svg xmlns='http://www.w3.org/2000/svg'></svg>")), null);
 });
+
+test("passwords hash with scrypt and verify; no '$' so they are safe in .env", async () => {
+  const { hashPassword, verifyPassword } = await import("../src/lib/password.ts");
+  const h = await hashPassword("glowpass123");
+  assert.match(h, /^scrypt:16384:8:1:[\w-]+:[\w-]+$/);
+  assert.ok(!h.includes("$"));
+  assert.equal(await verifyPassword("glowpass123", h), true);
+  assert.equal(await verifyPassword("glowpass124", h), false);
+  assert.equal(await verifyPassword("glowpass123", null), false);
+  assert.equal(await verifyPassword("x", "garbage"), false);
+  assert.notEqual(await hashPassword("glowpass123"), h, "salted");
+});

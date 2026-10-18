@@ -1,13 +1,13 @@
 {
-  "name": "Keshkala — salon hairstyle try-on",
-  "short_name": "Keshkala",
+  "name": "Try-Before-You-Cut — salon hairstyle try-on",
+  "short_name": "Try-Before-You-Cut",
   "description": "See it before the scissors. AI hairstyle previews for salon consultations.",
   "start_url": "/studio",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f7f3ec",
-  "theme_color": "#1c1b19",
+  "background_color": "#0c0b0a",
+  "theme_color": "#0c0b0a",
   "icons": [
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }

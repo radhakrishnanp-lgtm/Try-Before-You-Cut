@@ -177,7 +177,7 @@ export function SharePanel({ salon, view, styles, chosen, mode, token, onNoteSav
               <h3 style={{ margin: 0 }}>Love one of these?</h3>
               {salon.bookingUrl && <a className="btn btn-accent btn-block" href={salon.bookingUrl} target="_blank" rel="noopener noreferrer">Book with {salon.name}</a>}
               {salon.whatsappNumber && (
-                <a className="btn btn-ghost btn-block" style={{ color: "var(--paper)", borderColor: "rgba(255,255,255,.3)" }}
+                <a className="btn btn-ghost btn-block"
                   href={`https://wa.me/${salon.whatsappNumber}?text=${encodeURIComponent(`Hi ${salon.name}, I'd like to book: ${items.map((i) => i.name).join(", ")}`)}`}
                   target="_blank" rel="noopener noreferrer">
                   Message the salon

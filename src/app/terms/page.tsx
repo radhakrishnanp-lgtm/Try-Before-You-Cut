@@ -13,7 +13,7 @@ export default function Terms() {
         <h1>Salon terms (summary)</h1>
         <p className="muted"><em>Plain-language summary for pilots. The full agreement and Data Processing Addendum must be reviewed by counsel before paid launch.</em></p>
         <h2>Roles</h2>
-        <p>The salon is the Data Fiduciary for customer photos captured through its link or tablet. Keshkala is the salon's Data Processor and processes photos only on the salon's documented instructions: generating hairstyle previews for that customer.</p>
+        <p>The salon is the Data Fiduciary for customer photos captured through its link or tablet. Try-Before-You-Cut is the salon's Data Processor and processes photos only on the salon's documented instructions: generating hairstyle previews for that customer.</p>
         <h2>The salon agrees to</h2>
         <ul>
           <li>Only photograph a customer after they've accepted the consent screen themselves (or their guardian has, for under-18s).</li>
@@ -21,7 +21,7 @@ export default function Terms() {
           <li>Not download customer photos for marketing without separate written consent from the customer.</li>
           <li>Keep staff logins personal and remove staff who leave.</li>
         </ul>
-        <h2>Keshkala agrees to</h2>
+        <h2>Try-Before-You-Cut agrees to</h2>
         <ul>
           <li>Delete photos and previews within {RETENTION_HOURS} hours, and immediately on a customer's request.</li>
           <li>Never use customer photos to train models, and only use AI providers whose terms forbid training on API inputs.</li>

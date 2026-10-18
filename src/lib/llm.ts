@@ -73,7 +73,7 @@ async function request(model: string, messages: ChatMessage[], opts: { json?: bo
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${config.llmApiKey}`,
-      ...(isOpenRouter() ? { "HTTP-Referer": config.appUrl, "X-Title": "Keshkala" } : {}),
+      ...(isOpenRouter() ? { "HTTP-Referer": config.appUrl, "X-Title": "Try-Before-You-Cut" } : {}),
     },
     body: JSON.stringify(body),
   });

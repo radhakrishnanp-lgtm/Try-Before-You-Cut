@@ -73,7 +73,7 @@ export default async function Board({ params }: { params: Promise<{ token: strin
           <h2>Ready for the real thing?</h2>
           <div className="row" style={{ justifyContent: "center" }}>
             {salon.bookingUrl && <a className="btn btn-accent" href={salon.bookingUrl} target="_blank" rel="noopener noreferrer">Book with {salon.name}</a>}
-            <a className="btn btn-ghost" style={{ color: "var(--paper)", borderColor: "rgba(255,255,255,.3)" }} href={`/t/${salon.slug}`}>Try your own looks</a>
+            <a className="btn btn-ghost" href={`/t/${salon.slug}`}>Try your own looks</a>
           </div>
         </div>
       </main>

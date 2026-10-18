@@ -2,7 +2,7 @@ import { cleanupProviders, editImage, prepareProviders, usingMockAi } from "./ai
 import { buildHairPrompt } from "./ai/prompt";
 import { HttpError } from "./auth";
 import { getPrivate, putPrivate, removePrivate, signedUrl } from "./blob";
-import { CONSENT_VERSION, MAX_ROUNDS_PER_SESSION, MAX_STYLES_PER_ROUND, RETENTION_HOURS } from "./config";
+import { CONSENT_VERSION, MAX_ROUNDS_PER_SESSION, MAX_STYLES_PER_ROUND, RETENTION_HOURS, config } from "./config";
 import { keyedHash, randomToken, sha256 } from "./crypto";
 import { usingMockIdentity, verifier } from "./identity";
 import { sniffImage } from "./image-meta";
@@ -108,12 +108,19 @@ export async function startRound(session: TryOnSession, styleIds: string[], acto
     if (Object.keys(providerState).length) await store.updateSession(session.id, { providerState });
   }
 
-  if (!(await store.reserveCredits(salon.id, ids.length))) {
-    throw new HttpError(402, "This salon has used all of its try-ons for this period. Please ask the salon team.");
+  const cost = ids.length * config.creditsPerImage;
+  if (!(await store.reserveCredits(salon.id, cost))) {
+    const left = Math.floor(Math.max(0, salon.creditsTotal - salon.creditsUsed) / config.creditsPerImage);
+    throw new HttpError(
+      402,
+      left > 0
+        ? `Only ${left} look${left === 1 ? "" : "s"} left on this salon's credits. Pick ${left === 1 ? "one style" : `up to ${left} styles`}.`
+        : "This salon has used all of its credits. Please ask the salon team to top up.",
+    );
   }
   await store.updateSession(session.id, { rounds: session.rounds + 1 });
   const rows = await store.createResults(ids.map((styleId) => ({ sessionId: session.id, salonId: salon.id, styleId })));
-  await store.logAccess({ salonId: salon.id, sessionId: session.id, actor, action: `round.started:${ids.length}` });
+  await store.logAccess({ salonId: salon.id, sessionId: session.id, actor, action: `round.started:${ids.length}:${cost}cr` });
   return rows;
 }
 
@@ -125,7 +132,7 @@ export async function runResult(result: Result, session: TryOnSession, texture: 
     return current;
   }
   const fail = async (message: string, attempts: number) => {
-    await store.refundCredits(result.salonId, 1);
+    await store.refundCredits(result.salonId, config.creditsPerImage);
     return store.updateResult(result.id, { status: "failed", error: message, attempts, completedAt: new Date().toISOString() });
   };
 

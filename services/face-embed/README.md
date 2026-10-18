@@ -1,6 +1,6 @@
 # Face-embedding service
 
-A small FastAPI wrapper around [InsightFace](https://github.com/deepinsight/insightface) used by Keshkala for:
+A small FastAPI wrapper around [InsightFace](https://github.com/deepinsight/insightface) used by Try-Before-You-Cut for:
 
 1. **Photo check:** reject uploads with zero or several faces, or a face that is too small.
 2. **Identity check:** compare the ArcFace embedding of the original photo with every generated result. Below `IDENTITY_THRESHOLD` (default 0.45 cosine), the app retries once with a stricter prompt, then hides the result and refunds the credit.
@@ -10,8 +10,8 @@ Images are decoded in memory and never stored.
 ## Run
 
 ```bash
-docker build -t keshkala-face .
-docker run -p 8080:8080 -e FACE_SERVICE_TOKEN=secret keshkala-face
+docker build -t tbyc-face .
+docker run -p 8080:8080 -e FACE_SERVICE_TOKEN=secret tbyc-face
 ```
 
 Then set `FACE_SERVICE_URL=https://your-host` and `FACE_SERVICE_TOKEN=secret` in the web app. Cloud Run, Fly.io or Railway on a 2 vCPU / 2 GB instance handles pilot volume (~0.3 to 0.6 s per image on CPU) for a few hundred rupees a month with scale-to-zero.

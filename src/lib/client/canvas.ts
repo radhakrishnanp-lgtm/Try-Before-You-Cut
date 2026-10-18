@@ -50,10 +50,12 @@ export async function watermarked(url: string, brand: BrandInfo, styleName: stri
   c.height = img.height + band;
   const ctx = c.getContext("2d")!;
   ctx.drawImage(img, 0, 0);
-  ctx.fillStyle = "#1c1b19";
+  ctx.fillStyle = "#0e0c0b";
   ctx.fillRect(0, img.height, c.width, band);
+  ctx.fillStyle = brand.accentColor;
+  ctx.fillRect(0, img.height, c.width, Math.max(2, band * 0.03));
   const pad = band * 0.32;
-  ctx.fillStyle = "#f7f3ec";
+  ctx.fillStyle = "#f4eee5";
   ctx.font = font(SERIF, Math.round(band * 0.3), 500);
   ctx.textBaseline = "middle";
   ctx.fillText(brand.name, pad, img.height + band * 0.38);
@@ -103,7 +105,13 @@ export async function stylistBoard(opts: { brand: BrandInfo; before: string | nu
   c.width = W;
   c.height = Math.round(H);
   const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#f7f3ec";
+  // Dark luxe background with a warm glow in the accent colour.
+  ctx.fillStyle = "#0e0c0b";
+  ctx.fillRect(0, 0, W, H);
+  const glow = ctx.createRadialGradient(W * 0.85, 0, 0, W * 0.85, 0, W * 0.9);
+  glow.addColorStop(0, `${opts.brand.accentColor}40`);
+  glow.addColorStop(1, "rgba(14,12,11,0)");
+  ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, H);
 
   // Header
@@ -113,13 +121,17 @@ export async function stylistBoard(opts: { brand: BrandInfo; before: string | nu
       const logo = await loadImage(opts.brand.logoUrl);
       const lh = 84;
       const lw = Math.min(260, (logo.width / logo.height) * lh);
+      // Light plate so dark logos stay readable on the dark board.
+      ctx.fillStyle = "#f4eee5";
+      roundRect(ctx, pad - 12, 58, lw + 24, lh + 24, 18);
+      ctx.fill();
       ctx.drawImage(logo, pad, 70, lw, lh);
-      x = pad + lw + 28;
+      x = pad + lw + 40;
     } catch {
       /* logo is optional */
     }
   }
-  ctx.fillStyle = "#1c1b19";
+  ctx.fillStyle = "#f4eee5";
   ctx.textBaseline = "alphabetic";
   ctx.font = font(SERIF, 64, 500);
   ctx.fillText(opts.brand.name, x, 128);
@@ -139,7 +151,7 @@ export async function stylistBoard(opts: { brand: BrandInfo; before: string | nu
     ctx.save();
     roundRect(ctx, tx, ty, tileW, tileH, 22);
     ctx.clip();
-    ctx.fillStyle = "#efe7da";
+    ctx.fillStyle = "#1b1815";
     ctx.fillRect(tx, ty, tileW, tileH);
     const img = imgs[i];
     if (img) cover(ctx, img, tx, ty, tileW, tileH);
@@ -154,26 +166,28 @@ export async function stylistBoard(opts: { brand: BrandInfo; before: string | nu
       ctx.fillStyle = "#fff";
       ctx.fillText(label, tx + 30, ty + tileH - 27);
     }
-    ctx.fillStyle = "#1c1b19";
+    ctx.fillStyle = "#f4eee5";
     ctx.font = font(SERIF, 34, 500);
     ctx.fillText(t.name, tx, ty + tileH + 48);
   });
 
   let y = header + rows * (tileH + 70) + 20;
   if (opts.note) {
-    ctx.fillStyle = "#6e675d";
+    ctx.fillStyle = opts.brand.accentColor;
     ctx.font = font(SANS, 22, 700);
     ctx.fillText("STYLIST'S NOTE", pad, y + 20);
-    ctx.fillStyle = "#1c1b19";
+    ctx.fillStyle = "#f4eee5";
     ctx.font = font(SERIF, 32, 400);
     wrap(ctx, opts.note, pad, y + 66, W - pad * 2, 42, 2);
     y += noteH;
   }
 
   // Footer
-  ctx.fillStyle = "#1c1b19";
+  ctx.fillStyle = "#171411";
   ctx.fillRect(0, H - footer + 30, W, footer);
-  ctx.fillStyle = "#f7f3ec";
+  ctx.fillStyle = opts.brand.accentColor;
+  ctx.fillRect(0, H - footer + 30, W, 2);
+  ctx.fillStyle = "#f4eee5";
   ctx.font = font(SERIF, 38, 500);
   ctx.fillText(opts.brand.bookingUrl ? "Book this look" : `Visit ${opts.brand.name}`, pad, H - footer + 104);
   if (opts.brand.bookingUrl) {
@@ -181,10 +195,13 @@ export async function stylistBoard(opts: { brand: BrandInfo; before: string | nu
     ctx.font = font(SANS, 26, 700);
     ctx.fillText(opts.brand.bookingUrl.replace(/^https?:\/\//, ""), pad, H - footer + 146);
   }
-  ctx.fillStyle = "#b8afa2";
+  ctx.fillStyle = "#a79d8f";
   ctx.textAlign = "right";
   ctx.font = font(SANS, 20, 500);
   wrapRight(ctx, AI_DISCLAIMER, W - pad, H - footer + 100, 640, 28);
+  ctx.fillStyle = "#6f675d";
+  ctx.font = font(SANS, 17, 600);
+  ctx.fillText("Made with Try-Before-You-Cut", W - pad, H - 28);
   return toBlob(c);
 }
 

@@ -1,6 +1,6 @@
-// Keshkala service worker: caches the app shell only. Photos, results and
+// Try-Before-You-Cut service worker: caches the app shell only. Photos, results and
 // API responses are never cached (they are personal data with a 24h life).
-const CACHE = "keshkala-shell-v1";
+const CACHE = "tbyc-shell-v2";
 const SHELL = ["/", "/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {

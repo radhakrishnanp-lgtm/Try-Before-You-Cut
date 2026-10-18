@@ -1,19 +1,18 @@
 import Link from "next/link";
+import { BrandLink } from "./Brand";
 import { SignOut } from "./SignOut";
 
-export function SiteHeader({ email, links = [] }: { email?: string | null; links?: { href: string; label: string }[] }) {
+export function SiteHeader({ signedIn, who, links = [] }: { signedIn?: boolean; who?: string; links?: { href: string; label: string }[] }) {
   return (
     <header className="topbar">
       <div className="container topbar-inner">
-        <Link className="brand" href="/">
-          <span className="brand-mark" aria-hidden>K</span>
-          <span className="brand-name">Keshkala</span>
-        </Link>
+        <BrandLink />
         <nav className="row">
+          {who && <span className="small muted">{who}</span>}
           {links.map((l) => (
             <Link key={l.href} className="btn btn-ghost btn-sm" href={l.href}>{l.label}</Link>
           ))}
-          {email && <SignOut />}
+          {signedIn && <SignOut />}
         </nav>
       </div>
     </header>

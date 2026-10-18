@@ -62,7 +62,20 @@ const insightface: IdentityVerifier = {
 };
 
 // ------------------------------------------------- OpenAI-compatible vision
-const img = (i: Img) => ({ type: "image_url" as const, image_url: { url: dataUrl(i.bytes, i.mimeType) } });
+/** Vision models don't need 2K: send a 1024px JPEG to keep checks fast and cheap. */
+async function forVision(i: Img): Promise<Img> {
+  try {
+    const sharp = (await import("sharp")).default;
+    const bytes = await sharp(i.bytes).rotate().resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+    return { bytes: new Uint8Array(bytes), mimeType: "image/jpeg" };
+  } catch {
+    return i;
+  }
+}
+const img = async (i: Img) => {
+  const small = await forVision(i);
+  return { type: "image_url" as const, image_url: { url: dataUrl(small.bytes, small.mimeType) } };
+};
 
 const llmVision: IdentityVerifier = {
   name: "llm-vision",
@@ -80,7 +93,7 @@ const llmVision: IdentityVerifier = {
             '"problems": short customer-friendly fixes, e.g. "Turn to face the camera" or "Hair is cut off at the top"}. ' +
             "Do not describe or judge the person's appearance.",
         },
-        { role: "user", content: [img(photo), { type: "text", text: "Check this photo." }] },
+        { role: "user", content: [await img(photo), { type: "text", text: "Check this photo." }] },
       ],
     });
     return {
@@ -105,7 +118,7 @@ const llmVision: IdentityVerifier = {
             '{"samePerson": boolean, "likeness": 0-1 (1 = identical face), "hairChanged": boolean (the hairstyle visibly changed toward the requested style), ' +
             '"faceChanges": list of any face/skin changes you see}.',
         },
-        { role: "user", content: [img(original.photo), img(result), { type: "text", text: `Requested style: ${styleName}.` }] },
+        { role: "user", content: [await img(original.photo), await img(result), { type: "text", text: `Requested style: ${styleName}.` }] },
       ],
     });
     const likeness = Math.max(0, Math.min(1, Number(r.likeness ?? 0)));

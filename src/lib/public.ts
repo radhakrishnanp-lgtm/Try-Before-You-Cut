@@ -1,17 +1,18 @@
-import { PLANS, type Salon, type Style } from "./types";
+import { grievanceEmail } from "./legal";
+import type { Salon, Style } from "./types";
 
 /** Fields of a salon that are safe to send to any browser. */
 export function publicSalon(s: Salon) {
-  const branding = PLANS[s.plan].branding;
   return {
     id: s.id,
     slug: s.slug,
     name: s.name,
-    logoUrl: branding ? s.logoUrl : null,
-    accentColor: branding ? s.accentColor : "#b08d57",
+    logoUrl: s.logoUrl,
+    accentColor: s.accentColor,
     bookingUrl: s.bookingUrl,
     whatsappNumber: s.whatsappNumber,
     city: s.city,
+    grievanceEmail: grievanceEmail(),
   };
 }
 export type PublicSalon = ReturnType<typeof publicSalon>;

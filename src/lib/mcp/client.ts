@@ -7,10 +7,10 @@ import { parseToon } from "./toon.ts";
  * Pooled MCP client for Magnific (static bearer token). One connection per
  * server instance; a broken connection is dropped and reopened once.
  */
-const g = globalThis as unknown as { __keshkalaMcp?: Promise<Client> | null };
+const g = globalThis as unknown as { __tbycMcp?: Promise<Client> | null };
 
 function connect(): Promise<Client> {
-  const client = new Client({ name: "keshkala", version: "0.1.0" });
+  const client = new Client({ name: "try-before-you-cut", version: "0.1.0" });
   const transport = new StreamableHTTPClientTransport(new URL(config.magnificUrl), {
     requestInit: { headers: { authorization: `Bearer ${config.magnificToken}` } },
   });
@@ -18,11 +18,11 @@ function connect(): Promise<Client> {
 }
 
 async function getClient(): Promise<Client> {
-  g.__keshkalaMcp ??= connect().catch((err) => {
-    g.__keshkalaMcp = null;
+  g.__tbycMcp ??= connect().catch((err) => {
+    g.__tbycMcp = null;
     throw err;
   });
-  return g.__keshkalaMcp;
+  return g.__tbycMcp;
 }
 
 export class McpToolError extends Error {
@@ -67,7 +67,7 @@ export async function callTool<T = Record<string, unknown>>(name: string, args: 
     } catch (err) {
       if (err instanceof McpToolError) throw err;
       lastErr = err;
-      g.__keshkalaMcp = null; // reconnect on transport failure
+      g.__tbycMcp = null; // reconnect on transport failure
     }
   }
   throw new McpToolError(name, lastErr instanceof Error ? lastErr.message : String(lastErr));

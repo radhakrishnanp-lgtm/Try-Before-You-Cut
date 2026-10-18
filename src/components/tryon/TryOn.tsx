@@ -248,19 +248,22 @@ export function TryOn({ salon, styles, mode, staffName }: {
               onNoteSaved={setView} onBack={() => setStep("results")} toast={toast} />
           )}
           {step === "deleted" && (
-            <div className="narrow flow center">
-              <h1>Your data has been deleted</h1>
+            <div className="narrow flow center enter" style={{ paddingBottom: 30 }}>
+              <h1>Your data has been <em>deleted</em></h1>
               <p className="muted">Your photo and every preview were erased from our servers, and your consent was withdrawn.</p>
               <button className="btn btn-accent" onClick={() => setStep("consent")}>Start again</button>
             </div>
           )}
-          {step !== "consent" && step !== "deleted" && (
-            <footer className="container small muted" style={{ paddingBottom: 120, textAlign: "center" }}>
-              {hoursLeft !== null && <>Your photo and previews are deleted automatically in about {hoursLeft} hours. </>}
-              <button className="btn-link" onClick={deleteData}>Delete my data now</button>
-              {" · "}<a href="/privacy">Privacy</a>
-            </footer>
-          )}
+          <footer className="container small muted" style={{ paddingBottom: 120, textAlign: "center" }}>
+            {step !== "consent" && step !== "deleted" && (
+              <p style={{ marginBottom: 8 }}>
+                {hoursLeft !== null && <>Your photo and previews are deleted automatically in about {hoursLeft} hours. </>}
+                <button className="btn-link" onClick={deleteData}>Delete my data now</button>
+                {" · "}<a href="/privacy">Privacy</a>
+              </p>
+            )}
+            <span style={{ color: "var(--faint)" }}>Powered by <a href="/">Try-Before-You-Cut</a></span>
+          </footer>
         </main>
       )}
       {toastMsg && <div className="toast" role="status">{toastMsg}</div>}

@@ -1,7 +1,6 @@
 export type Gender = "men" | "women";
 export type Length = "short" | "medium" | "long";
 export type Texture = "straight" | "wavy" | "curly";
-export type PlanId = "pilot" | "starter" | "pro" | "chain";
 export type Role = "owner" | "staff";
 export type SessionMode = "studio" | "remote";
 export type ResultStatus = "pending" | "running" | "ready" | "failed";
@@ -38,10 +37,10 @@ export interface Salon {
   bookingUrl: string | null;
   whatsappNumber: string | null;
   city: string | null;
-  plan: PlanId;
-  creditsTotal: number; // allowance for the current period
+  /** Credits ever granted to the salon; balance = creditsTotal - creditsUsed. */
+  creditsTotal: number;
+  /** Credits spent (CREDITS_PER_IMAGE per look; failed looks are refunded). */
   creditsUsed: number;
-  periodStart: string;
   active: boolean;
   disabledStyleIds: string[];
   createdAt: string;
@@ -50,7 +49,8 @@ export interface Salon {
 export interface Member {
   id: string;
   salonId: string;
-  email: string;
+  /** Login name, unique across the platform. */
+  username: string;
   name: string | null;
   role: Role;
   createdAt: string;
@@ -118,10 +118,3 @@ export interface AccessLog {
   action: string;
   createdAt: string;
 }
-
-export const PLANS: Record<PlanId, { name: string; priceInr: number | null; tryOns: number; branding: boolean; multiDevice: boolean }> = {
-  pilot: { name: "Pilot (14 days)", priceInr: 0, tryOns: 100, branding: true, multiDevice: true },
-  starter: { name: "Starter", priceInr: 1999, tryOns: 300, branding: false, multiDevice: false },
-  pro: { name: "Pro", priceInr: 4999, tryOns: 1000, branding: true, multiDevice: true },
-  chain: { name: "Chain", priceInr: null, tryOns: 5000, branding: true, multiDevice: true },
-};

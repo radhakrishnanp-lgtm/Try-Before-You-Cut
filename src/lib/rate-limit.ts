@@ -3,8 +3,8 @@
  * rather than a hard guarantee; hard cost limits come from salon credits and
  * per-session round caps enforced in the database.
  */
-const g = globalThis as unknown as { __keshkalaRl?: Map<string, { count: number; reset: number }> };
-const buckets = (g.__keshkalaRl ??= new Map());
+const g = globalThis as unknown as { __tbycRl?: Map<string, { count: number; reset: number }> };
+const buckets = (g.__tbycRl ??= new Map());
 
 export function rateLimit(key: string, limit: number, windowMs: number): boolean {
   const t = Date.now();

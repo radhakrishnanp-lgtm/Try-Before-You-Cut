@@ -2,55 +2,56 @@
 import { useState } from "react";
 import { api } from "@/lib/client/api";
 
-export function LoginForm({ next, demo }: { next: string; demo: boolean }) {
-  const [email, setEmail] = useState("");
-  const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
+export function LoginForm({ next, demoLogins }: { next: string; demoLogins: { label: string; username: string; password: string }[] }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(addr: string) {
-    setState("sending");
+  async function submit(u: string, p: string) {
+    setBusy(true);
     setError(null);
     try {
-      const res = await api<{ demo?: boolean }>("/api/auth/login", { method: "POST", json: { email: addr, next } });
-      if (res.demo) {
-        window.location.href = addr.startsWith("admin@") ? "/admin" : next;
-        return;
-      }
-      setState("sent");
+      const res = await api<{ redirect: string }>("/api/auth/login", { method: "POST", json: { username: u, password: p } });
+      window.location.href = next && next.startsWith("/") && !next.startsWith("//") && res.redirect !== "/admin" ? next : res.redirect;
     } catch (e) {
       setError((e as Error).message);
-      setState("idle");
+      setBusy(false);
     }
   }
 
-  if (state === "sent") {
-    return (
-      <div className="card">
-        <h3>Check your inbox</h3>
-        <p className="muted" style={{ margin: 0 }}>If {email} belongs to a salon team, a sign-in link is on its way. Open it on this device.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="stack">
-      <form className="card stack" onSubmit={(e) => { e.preventDefault(); void submit(email); }}>
+    <div className="stack depth-1">
+      <form className="stack" onSubmit={(e) => { e.preventDefault(); void submit(username, password); }}>
         <label className="field">
-          <span>Work email</span>
-          <input className="input" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@yoursalon.in" />
+          <span>Username</span>
+          <input className="input" required autoComplete="username" autoCapitalize="none" spellCheck={false} value={username} onChange={(e) => setUsername(e.target.value)} placeholder="your-salon" />
+        </label>
+        <label className="field">
+          <span>Password</span>
+          <div style={{ position: "relative" }}>
+            <input className="input" required type={show ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ paddingRight: 80 }} />
+            <button type="button" className="btn-link small" style={{ position: "absolute", right: 14, top: 16 }} onClick={() => setShow(!show)}>{show ? "Hide" : "Show"}</button>
+          </div>
         </label>
         {error && <div className="notice notice-bad" role="alert">{error}</div>}
-        <button className="btn btn-accent btn-block" disabled={state === "sending"}>{state === "sending" ? "Sending…" : demo ? "Sign in" : "Email me a sign-in link"}</button>
+        <button className="btn btn-block" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
       </form>
-      {demo && (
-        <div className="card">
+      <p className="small muted center" style={{ margin: 0 }}>Forgot your password? Ask your salon owner or Try-Before-You-Cut support to reset it.</p>
+      {demoLogins.length > 0 && (
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 16 }}>
           <div className="eyebrow">Demo mode</div>
-          <p className="small muted">No Supabase project is configured, so sign-in is simulated. Pick a demo account:</p>
           <div className="row">
-            <button className="btn btn-ghost btn-sm" onClick={() => submit("owner@demo.salon")}>Salon owner</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => submit("staff@demo.salon")}>Stylist</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => submit("admin@demo.salon")}>Platform admin</button>
+            {demoLogins.map((d) => (
+              <button key={d.username} type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => submit(d.username, d.password)}>
+                {d.label}
+              </button>
+            ))}
           </div>
+          <p className="small muted" style={{ marginTop: 10, marginBottom: 0 }}>
+            {demoLogins.map((d) => `${d.username} / ${d.password}`).join(" · ")}
+          </p>
         </div>
       )}
     </div>

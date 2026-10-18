@@ -1,5 +1,5 @@
 """
-Keshkala face-embedding service.
+Try-Before-You-Cut face-embedding service.
 
 POST /analyse (multipart field "image") ->
   {"width": int, "height": int, "faces": [{"bbox": [x1,y1,x2,y2], "det_score": float, "embedding": [512 floats]}]}
@@ -18,7 +18,7 @@ from insightface.app import FaceAnalysis
 TOKEN = os.environ.get("FACE_SERVICE_TOKEN", "")
 MODEL = os.environ.get("INSIGHTFACE_MODEL", "buffalo_l")
 
-app = FastAPI(title="keshkala-face-embed", docs_url=None, redoc_url=None)
+app = FastAPI(title="tbyc-face-embed", docs_url=None, redoc_url=None)
 analyzer = FaceAnalysis(name=MODEL, allowed_modules=["detection", "recognition"], providers=["CPUExecutionProvider"])
 analyzer.prepare(ctx_id=-1, det_size=(640, 640))
 

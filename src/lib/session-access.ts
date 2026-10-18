@@ -18,10 +18,9 @@ export async function authorizeSession(req: Request, sessionId: string): Promise
     return { session, actor: "customer" };
   }
   const ctx = await staffContext();
-  const member = ctx?.memberships.find((m) => m.salonId === session.salonId);
-  if (member) {
+  if (ctx?.member?.salonId === session.salonId || ctx?.isAdmin) {
     assertLive(session);
-    return { session, actor: `member:${member.id}` };
+    return { session, actor: ctx.member ? `member:${ctx.member.id}` : "admin" };
   }
   throw new HttpError(403, "Not allowed");
 }

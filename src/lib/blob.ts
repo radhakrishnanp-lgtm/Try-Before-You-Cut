@@ -1,73 +1,72 @@
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { config, isDemo } from "./config";
-import { sign, safeEqual } from "./crypto";
-import { adminClient } from "./store/supabase";
+import { safeEqual, sign } from "./crypto";
 
 /**
- * Private image storage. Supabase Storage (private bucket + signed URLs) in
- * production; an in-memory map with HMAC-signed URLs in demo mode.
+ * Image storage. Self-hosted: files on local disk under STORAGE_DIR
+ * (private/ for photos and results, public/ for salon logos). Demo: memory.
+ * Private files are only reachable through short-lived HMAC-signed URLs.
  */
-const BUCKET = "tryon";
-const BRANDING = "branding";
+const g = globalThis as unknown as { __tbycBlobs?: Map<string, { bytes: Uint8Array; mime: string }> };
+const mem = (g.__tbycBlobs ??= new Map());
 
-const g = globalThis as unknown as { __keshkalaBlobs?: Map<string, { bytes: Uint8Array; mime: string }> };
-const mem = (g.__keshkalaBlobs ??= new Map());
+const MIME: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
 
-export async function putPrivate(key: string, bytes: Uint8Array, mime: string): Promise<void> {
+function safeKey(key: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9/_.-]*$/.test(key) || key.includes("..")) throw new Error("invalid storage key");
+  return key;
+}
+
+function diskPath(area: "private" | "public", key: string) {
+  return path.resolve(config.storageDir, area, safeKey(key));
+}
+
+async function put(area: "private" | "public", key: string, bytes: Uint8Array, mime: string) {
   if (isDemo) {
-    mem.set(key, { bytes, mime });
+    mem.set(`${area}/${safeKey(key)}`, { bytes, mime });
     return;
   }
-  const { error } = await adminClient().storage.from(BUCKET).upload(key, bytes, { contentType: mime, upsert: true });
-  if (error) throw new Error(`storage upload failed: ${error.message}`);
+  const file = diskPath(area, key);
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, bytes, { mode: 0o600 });
 }
 
-export async function getPrivate(key: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
-  if (isDemo) return mem.get(key) ?? null;
-  const { data, error } = await adminClient().storage.from(BUCKET).download(key);
-  if (error || !data) return null;
-  return { bytes: new Uint8Array(await data.arrayBuffer()), mime: data.type || "image/jpeg" };
+async function get(area: "private" | "public", key: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
+  if (isDemo) return mem.get(`${area}/${safeKey(key)}`) ?? null;
+  try {
+    const bytes = new Uint8Array(await readFile(diskPath(area, key)));
+    return { bytes, mime: MIME[key.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream" };
+  } catch {
+    return null;
+  }
 }
+
+export const putPrivate = (key: string, bytes: Uint8Array, mime: string) => put("private", key, bytes, mime);
+export const getPrivate = (key: string) => get("private", key);
 
 export async function removePrivate(keys: string[]): Promise<void> {
-  const list = keys.filter(Boolean);
-  if (list.length === 0) return;
-  if (isDemo) {
-    list.forEach((k) => mem.delete(k));
-    return;
+  for (const key of keys.filter(Boolean)) {
+    if (isDemo) mem.delete(`private/${safeKey(key)}`);
+    else await rm(diskPath("private", key), { force: true });
   }
-  const { error } = await adminClient().storage.from(BUCKET).remove(list);
-  if (error) throw new Error(`storage delete failed: ${error.message}`);
 }
 
-/** Short-lived URL for a private object. */
+/** Short-lived URL for a private file. */
 export async function signedUrl(key: string, ttlSeconds = 3600): Promise<string> {
-  if (isDemo) {
-    const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
-    return `/api/media?k=${encodeURIComponent(key)}&e=${exp}&s=${sign(`${key}:${exp}`)}`;
-  }
-  const { data, error } = await adminClient().storage.from(BUCKET).createSignedUrl(key, ttlSeconds);
-  if (error || !data) throw new Error(`could not sign url: ${error?.message}`);
-  return data.signedUrl;
+  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  return `/api/media?k=${encodeURIComponent(key)}&e=${exp}&s=${sign(`${key}:${exp}`)}`;
 }
 
-export function verifyDemoMediaSignature(key: string, exp: string, sig: string): boolean {
-  if (Number(exp) < Date.now() / 1000) return false;
+export function verifyMediaSignature(key: string, exp: string, sig: string): boolean {
+  if (!(Number(exp) > Date.now() / 1000)) return false;
   return safeEqual(sign(`${key}:${exp}`), sig);
 }
 
-/** Public branding assets (salon logos). */
+/** Public branding assets (salon logos). Returns the URL to store. */
 export async function putPublic(key: string, bytes: Uint8Array, mime: string): Promise<string> {
-  if (isDemo) {
-    mem.set(`public/${key}`, { bytes, mime });
-    return `/api/media/public?k=${encodeURIComponent(`public/${key}`)}`;
-  }
-  const { error } = await adminClient().storage.from(BRANDING).upload(key, bytes, { contentType: mime, upsert: true });
-  if (error) throw new Error(`logo upload failed: ${error.message}`);
-  return adminClient().storage.from(BRANDING).getPublicUrl(key).data.publicUrl;
+  await put("public", key, bytes, mime);
+  return `/api/media/public?k=${encodeURIComponent(key)}`;
 }
 
-export function getDemoPublic(key: string) {
-  return key.startsWith("public/") ? mem.get(key) ?? null : null;
-}
-
-export const appUrl = config.appUrl;
+export const getPublic = (key: string) => get("public", key);

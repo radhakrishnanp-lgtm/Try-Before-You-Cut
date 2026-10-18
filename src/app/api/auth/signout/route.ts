@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import { DEMO_COOKIE, supabaseServer } from "@/lib/auth";
-import { isDemo } from "@/lib/config";
+import { SESSION_COOKIE } from "@/lib/auth";
 
 export async function POST() {
   const res = NextResponse.json({ ok: true });
-  if (isDemo) res.cookies.delete(DEMO_COOKIE);
-  else await (await supabaseServer()).auth.signOut();
+  res.cookies.delete(SESSION_COOKIE);
   return res;
 }

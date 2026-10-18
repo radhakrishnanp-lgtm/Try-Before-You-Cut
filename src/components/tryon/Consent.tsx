@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { Tilt } from "@/components/fx/Tilt";
 import { consentPoints } from "@/lib/legal";
 import type { PublicSalon } from "./types";
 
@@ -15,17 +16,17 @@ export function Consent({ salon, mode, busy, onAccept }: {
   const ok = agree && (!isMinor || guardian);
 
   return (
-    <div className="narrow flow">
+    <div className="narrow flow enter">
       <div className="eyebrow">{mode === "studio" ? "In-salon consultation" : `Welcome to ${salon.name}`}</div>
-      <h1>See your next haircut on you, before a single snip.</h1>
+      <h1>See your next haircut on <em>you</em>, before a single snip.</h1>
       <p className="muted" style={{ fontSize: "1.1rem" }}>
         Take one photo, pick up to four styles and compare realistic previews side by side with your stylist.
       </p>
 
-      <div className="card" style={{ marginTop: 28 }}>
+      <Tilt className="card" max={2} style={{ marginTop: 28 }}>
         <h2 style={{ fontSize: "1.35rem" }}>Before we take your photo</h2>
         <ul className="consent-list">
-          {consentPoints(salon.name).map((p) => (
+          {consentPoints(salon.name, salon.grievanceEmail).map((p) => (
             <li key={p.title}>
               <strong>{p.title}</strong>
               <span>{p.body}</span>
@@ -34,7 +35,7 @@ export function Consent({ salon, mode, busy, onAccept }: {
         </ul>
         <label className="check">
           <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-          <span>I agree to {salon.name} and Keshkala using my photo only for this hairstyle preview, as described above.</span>
+          <span>I agree to {salon.name} and Try-Before-You-Cut using my photo only for this hairstyle preview, as described above.</span>
         </label>
         <label className="check">
           <input type="checkbox" checked={isMinor} onChange={(e) => setIsMinor(e.target.checked)} />
@@ -52,7 +53,7 @@ export function Consent({ salon, mode, busy, onAccept }: {
         <p className="small muted center" style={{ marginTop: 12, marginBottom: 0 }}>
           You can withdraw consent and delete everything at any time. <a href="/privacy">Privacy policy</a>
         </p>
-      </div>
+      </Tilt>
     </div>
   );
 }

@@ -1,30 +1,29 @@
 "use client";
 import { useMemo, useState } from "react";
 import { StyleArt } from "@/components/StyleArt";
+import { Tilt } from "@/components/fx/Tilt";
 import { api } from "@/lib/client/api";
 import type { UsageStats } from "@/lib/store/types";
-import type { Gender, Length, Member, PLANS, Role, Salon, StyleArt as Art, Texture } from "@/lib/types";
+import type { Gender, Length, Member, Role, Salon, StyleArt as Art, Texture } from "@/lib/types";
 
-type Plan = (typeof PLANS)[keyof typeof PLANS];
 interface StyleRow { id: string; name: string; gender: Gender; length: Length; art: Art; textures: Texture[]; custom: boolean }
 interface SessionRow { id: string; mode: "studio" | "remote"; createdAt: string; rounds: number; deleted: boolean }
 
 const TABS = ["Overview", "Branding", "Styles", "Team"] as const;
-const SWATCHES = ["#b08d57", "#8c5a3c", "#7a2e3a", "#2f5d50", "#36507a", "#5b4a7a", "#1c1b19"];
+const SWATCHES = ["#d6ab63", "#c7866a", "#b4566a", "#6fae95", "#6f8fd0", "#9b7fd0", "#e8e1d6"];
 
 export function Dashboard(props: {
   salon: Salon;
-  plan: Plan;
   role: Role;
-  me: string;
+  me: string | null;
   members: Member[];
   styles: StyleRow[];
-  usage: UsageStats;
   usage30: UsageStats;
   recent: SessionRow[];
   link: string;
   qrSvg: string;
-  otherSalons: string[];
+  creditsPerImage: number;
+  studioHref: string;
   demo: boolean;
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
@@ -32,6 +31,7 @@ export function Dashboard(props: {
   const [members, setMembers] = useState(props.members);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const owner = props.role === "owner";
+  const cpi = props.creditsPerImage;
 
   const flash = (ok: boolean, text: string) => {
     setMsg({ ok, text });
@@ -48,20 +48,21 @@ export function Dashboard(props: {
     }
   }
 
-  const left = Math.max(0, salon.creditsTotal - salon.creditsUsed);
-  const pct = Math.min(100, (salon.creditsUsed / Math.max(1, salon.creditsTotal)) * 100);
+  const balance = Math.max(0, salon.creditsTotal - salon.creditsUsed);
+  const photosLeft = Math.floor(balance / cpi);
+  const pctLeft = salon.creditsTotal ? Math.min(100, (balance / salon.creditsTotal) * 100) : 0;
   const shareRate = props.usage30.sessions ? Math.round((props.usage30.sharedSessions / props.usage30.sessions) * 100) : 0;
 
   return (
     <main className="container flow" style={{ ["--accent" as string]: salon.accentColor }}>
-      <div className="spread" style={{ marginBottom: 16 }}>
+      <div className="spread enter" style={{ marginBottom: 18 }}>
         <div>
-          <div className="eyebrow">{props.plan.name} plan · {owner ? "Owner" : "Stylist"}</div>
+          <div className="eyebrow">{owner ? "Owner" : "Stylist"} dashboard</div>
           <h1 style={{ marginBottom: 0 }}>{salon.name}</h1>
         </div>
-        <a className="btn btn-accent" href={`/studio?salon=${salon.id}`}>Start a consultation</a>
+        <a className="btn btn-accent" href={props.studioHref}>Start a consultation →</a>
       </div>
-      {props.demo && <div className="notice notice-warn" style={{ marginBottom: 16 }}>Demo mode: data is kept in memory and resets when the server restarts.</div>}
+      {props.demo && <div className="notice notice-warn" style={{ marginBottom: 16 }}>Demo mode: data lives in memory and resets when the server restarts.</div>}
 
       <div className="tabs" role="tablist">
         {TABS.filter((t) => owner || t === "Overview").map((t) => (
@@ -72,31 +73,40 @@ export function Dashboard(props: {
 
       {tab === "Overview" && (
         <div className="stack">
-          <div className="card">
-            <div className="spread">
+          <Tilt className="card panel-dark" max={3}>
+            <div className="spread depth-1">
               <div>
-                <h3 style={{ marginBottom: 2 }}>Try-ons this period</h3>
-                <p className="small muted" style={{ margin: 0 }}>Since {new Date(salon.periodStart).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}. Failed or rejected looks are refunded automatically.</p>
+                <div className="eyebrow">Credit balance</div>
+                <div className="serif" style={{ fontSize: "3.2rem", lineHeight: 1 }}>
+                  <span className="text-gold" style={{ fontStyle: "normal" }}>{photosLeft.toLocaleString("en-IN")}</span>
+                  <span className="muted" style={{ fontSize: "1.2rem" }}> looks left</span>
+                </div>
+                <p className="small muted" style={{ margin: "8px 0 0" }}>
+                  {balance.toLocaleString("en-IN")} credits · {cpi} credits per look · {salon.creditsUsed.toLocaleString("en-IN")} used of {salon.creditsTotal.toLocaleString("en-IN")}
+                </p>
               </div>
-              <div className="serif" style={{ fontSize: "1.6rem" }}>{salon.creditsUsed} <span className="muted" style={{ fontSize: "1rem" }}>/ {salon.creditsTotal}</span></div>
+              <div style={{ minWidth: 240, flex: "0 1 360px" }}>
+                <div className="meter"><span style={{ width: `${pctLeft}%` }} /></div>
+                <p className="small muted" style={{ marginTop: 10, marginBottom: 0 }}>
+                  {photosLeft < 10 ? "Running low. Contact Try-Before-You-Cut support to top up." : "Looks that fail the quality check are refunded automatically."}
+                </p>
+              </div>
             </div>
-            <div className="progress" style={{ marginTop: 14 }}><span style={{ width: `${pct}%`, background: pct > 85 ? "var(--warn)" : undefined }} /></div>
-            <p className="small muted" style={{ marginTop: 8, marginBottom: 0 }}>{left} try-ons left. Need more? Reply to your invoice email or contact Keshkala support.</p>
-          </div>
+          </Tilt>
 
           <div className="stats">
-            <Stat n={props.usage30.sessions} l="Sessions (30 days)" />
+            <Stat n={props.usage30.sessions} l="Consultations (30 days)" />
             <Stat n={props.usage30.tryOns} l="Looks created (30 days)" />
-            <Stat n={`${shareRate}%`} l="Sessions shared" />
-            <Stat n={props.usage30.failed} l="Looks not shown (refunded)" />
+            <Stat n={`${shareRate}%`} l="Shared to customers" />
+            <Stat n={props.usage30.failed} l="Looks refunded" />
           </div>
 
           <div className="grid-2">
-            <div className="card">
-              <h3>Your customer link</h3>
-              <p className="small muted">Print the QR at reception or share the link on Instagram and WhatsApp. Customers try styles at home, then book.</p>
-              <div className="row" style={{ alignItems: "flex-start" }}>
-                <div style={{ width: 140, height: 140, background: "#fff", borderRadius: 12, padding: 8 }} dangerouslySetInnerHTML={{ __html: props.qrSvg }} />
+            <Tilt className="card" max={4}>
+              <h3 className="depth-1">Your customer link</h3>
+              <p className="small muted depth-1">Print the QR at reception or share it on Instagram and WhatsApp. Customers try looks at home, then book.</p>
+              <div className="row depth-2" style={{ alignItems: "flex-start" }}>
+                <div style={{ width: 150, height: 150, background: "#f4eee5", borderRadius: 16, padding: 10, boxShadow: "0 20px 40px -20px rgba(0,0,0,.9)" }} dangerouslySetInnerHTML={{ __html: props.qrSvg }} />
                 <div className="stack" style={{ flex: 1, minWidth: 180 }}>
                   <code className="small" style={{ wordBreak: "break-all" }}>{props.link}</code>
                   <div className="row">
@@ -105,15 +115,15 @@ export function Dashboard(props: {
                   </div>
                 </div>
               </div>
-            </div>
+            </Tilt>
             <div className="card">
-              <h3>Recent sessions</h3>
+              <h3>Recent consultations</h3>
               <p className="small muted">Photos are never shown here and are deleted after 24 hours.</p>
               <div className="table-wrap">
                 <table className="table">
                   <thead><tr><th>When</th><th>Where</th><th>Rounds</th><th>Data</th></tr></thead>
                   <tbody>
-                    {props.recent.length === 0 && <tr><td colSpan={4} className="muted">No sessions yet.</td></tr>}
+                    {props.recent.length === 0 && <tr><td colSpan={4} className="muted">No consultations yet.</td></tr>}
                     {props.recent.map((s) => (
                       <tr key={s.id}>
                         <td>{new Date(s.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</td>
@@ -130,7 +140,7 @@ export function Dashboard(props: {
         </div>
       )}
 
-      {tab === "Branding" && owner && <Branding salon={salon} plan={props.plan} onSave={save} onLogo={setSalon} flash={flash} />}
+      {tab === "Branding" && owner && <Branding salon={salon} onSave={save} onLogo={setSalon} flash={flash} />}
       {tab === "Styles" && owner && <Styles salon={salon} styles={props.styles} onSave={save} />}
       {tab === "Team" && owner && <Team salonId={salon.id} me={props.me} members={members} setMembers={setMembers} flash={flash} />}
     </main>
@@ -139,16 +149,15 @@ export function Dashboard(props: {
 
 function Stat({ n, l }: { n: number | string; l: string }) {
   return (
-    <div className="card stat">
-      <div className="num">{n}</div>
-      <div className="lbl">{l}</div>
-    </div>
+    <Tilt className="card stat" max={10}>
+      <div className="num depth-2">{n}</div>
+      <div className="lbl depth-1">{l}</div>
+    </Tilt>
   );
 }
 
-function Branding({ salon, plan, onSave, onLogo, flash }: {
+function Branding({ salon, onSave, onLogo, flash }: {
   salon: Salon;
-  plan: Plan;
   onSave: (p: Partial<Salon>) => Promise<void>;
   onLogo: (s: Salon) => void;
   flash: (ok: boolean, t: string) => void;
@@ -180,31 +189,31 @@ function Branding({ salon, plan, onSave, onLogo, flash }: {
         <label className="field"><span>Booking link</span><input className="input" type="url" value={booking} onChange={(e) => setBooking(e.target.value)} placeholder="https://…" /></label>
         <label className="field"><span>Salon WhatsApp (with country code)</span><input className="input" inputMode="tel" value={wa} onChange={(e) => setWa(e.target.value)} placeholder="919812345678" /></label>
         <label className="field"><span>City</span><input className="input" value={city} onChange={(e) => setCity(e.target.value)} /></label>
-        <button className="btn btn-accent">Save details</button>
+        <button className="btn">Save details</button>
       </form>
 
       <div className="card stack">
         <h3>Logo & colour</h3>
-        {!plan.branding && <div className="notice notice-warn">Logo and colour branding are included in the Pro plan. Your boards use the Keshkala brass accent.</div>}
+        <p className="small muted" style={{ margin: 0 }}>Shown on the customer screens, downloads and every Stylist Board.</p>
         <div className="row">
-          <div style={{ width: 120, height: 72, borderRadius: 12, border: "1px solid var(--line)", display: "grid", placeItems: "center", background: "#fff", overflow: "hidden" }}>
+          <div style={{ width: 130, height: 76, borderRadius: 14, border: "1px solid var(--line)", display: "grid", placeItems: "center", background: "rgba(0,0,0,.3)", overflow: "hidden" }}>
             {salon.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={salon.logoUrl} alt="Logo" style={{ maxHeight: 60, maxWidth: 110, objectFit: "contain" }} />
+              <img src={salon.logoUrl} alt="Logo" style={{ maxHeight: 62, maxWidth: 118, objectFit: "contain" }} />
             ) : <span className="small muted">No logo</span>}
           </div>
-          <label className="btn btn-ghost btn-sm" aria-disabled={!plan.branding} style={{ opacity: plan.branding ? 1 : 0.5 }}>
+          <label className="btn btn-ghost btn-sm">
             {uploading ? "Uploading…" : "Upload PNG or JPG"}
-            <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={!plan.branding} onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ""; }} />
+            <input type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ""; }} />
           </label>
         </div>
         <div>
-          <div className="small" style={{ fontWeight: 650, marginBottom: 8 }}>Accent colour</div>
+          <div className="small" style={{ fontWeight: 700, marginBottom: 10, color: "var(--muted)" }}>Accent colour</div>
           <div className="row">
             {SWATCHES.map((c) => (
-              <button key={c} className="swatch" style={{ background: c }} aria-label={`Use ${c}`} aria-pressed={salon.accentColor === c} disabled={!plan.branding} onClick={() => onSave({ accentColor: c })} />
+              <button key={c} className="swatch" style={{ background: c }} aria-label={`Use ${c}`} aria-pressed={salon.accentColor === c} onClick={() => onSave({ accentColor: c })} />
             ))}
-            <input type="color" aria-label="Custom colour" value={salon.accentColor} disabled={!plan.branding} onChange={(e) => onSave({ accentColor: e.target.value })} style={{ width: 44, height: 44, border: 0, background: "none" }} />
+            <input type="color" aria-label="Custom colour" value={salon.accentColor} onChange={(e) => onSave({ accentColor: e.target.value })} style={{ width: 44, height: 44, border: 0, background: "none" }} />
           </div>
         </div>
       </div>
@@ -235,7 +244,7 @@ function Styles({ salon, styles, onSave }: { salon: Salon; styles: StyleRow[]; o
         </div>
         <div className="row">
           <span className="small muted">{styles.length - disabled.size} of {styles.length} visible</span>
-          <button className="btn btn-accent btn-sm" disabled={!dirty} onClick={() => onSave({ disabledStyleIds: [...disabled] })}>Save changes</button>
+          <button className="btn btn-sm" disabled={!dirty} onClick={() => onSave({ disabledStyleIds: [...disabled] })}>Save changes</button>
         </div>
       </div>
       <p className="small muted" style={{ margin: 0 }}>Untick the styles your team doesn't offer. Customers only see ticked styles.</p>
@@ -257,28 +266,40 @@ function Styles({ salon, styles, onSave }: { salon: Salon; styles: StyleRow[]; o
 
 function Team({ salonId, me, members, setMembers, flash }: {
   salonId: string;
-  me: string;
+  me: string | null;
   members: Member[];
   setMembers: (m: Member[]) => void;
   flash: (ok: boolean, t: string) => void;
 }) {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<Role>("staff");
 
   async function add() {
     try {
-      const { member } = await api<{ member: Member }>(`/api/dashboard/${salonId}/members`, { method: "POST", json: { email, name, role } });
-      setMembers([...members.filter((m) => m.id !== member.id), member]);
-      setEmail("");
+      const { member } = await api<{ member: Member }>(`/api/dashboard/${salonId}/members`, { method: "POST", json: { username, password, name, role } });
+      setMembers([...members, member]);
+      setUsername("");
+      setPassword("");
       setName("");
-      flash(true, `${member.email} can now sign in with a magic link`);
+      flash(true, `${member.username} can now sign in. Share the password with them privately.`);
+    } catch (e) {
+      flash(false, (e as Error).message);
+    }
+  }
+  async function reset(m: Member) {
+    const pw = window.prompt(`New password for ${m.username} (at least 8 characters):`);
+    if (!pw) return;
+    try {
+      await api(`/api/dashboard/${salonId}/members`, { method: "PATCH", json: { memberId: m.id, password: pw } });
+      flash(true, `Password changed for ${m.username}. They'll need to sign in again.`);
     } catch (e) {
       flash(false, (e as Error).message);
     }
   }
   async function remove(m: Member) {
-    if (!window.confirm(`Remove ${m.email}?`)) return;
+    if (!window.confirm(`Remove ${m.username}? They will no longer be able to sign in.`)) return;
     try {
       await api(`/api/dashboard/${salonId}/members?id=${m.id}`, { method: "DELETE" });
       setMembers(members.filter((x) => x.id !== m.id));
@@ -290,16 +311,21 @@ function Team({ salonId, me, members, setMembers, flash }: {
   return (
     <div className="grid-2" style={{ alignItems: "start" }}>
       <div className="card">
-        <h3>Team</h3>
+        <h3>Team logins</h3>
         <div className="table-wrap">
           <table className="table">
             <thead><tr><th>Person</th><th>Role</th><th /></tr></thead>
             <tbody>
               {members.map((m) => (
                 <tr key={m.id}>
-                  <td><strong>{m.name ?? "—"}</strong><div className="small muted">{m.email}</div></td>
+                  <td><strong>{m.name ?? m.username}</strong><div className="small muted">@{m.username}</div></td>
                   <td>{m.role === "owner" ? "Owner" : "Stylist"}</td>
-                  <td style={{ textAlign: "right" }}>{m.id !== me && <button className="btn btn-danger btn-sm" onClick={() => remove(m)}>Remove</button>}</td>
+                  <td style={{ textAlign: "right" }}>
+                    <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => reset(m)}>Password</button>
+                      {m.id !== me && <button className="btn btn-danger btn-sm" onClick={() => remove(m)}>Remove</button>}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -307,16 +333,17 @@ function Team({ salonId, me, members, setMembers, flash }: {
         </div>
       </div>
       <form className="card stack" onSubmit={(e) => { e.preventDefault(); void add(); }}>
-        <h3>Add a team member</h3>
-        <label className="field"><span>Email</span><input className="input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-        <label className="field"><span>Name</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <h3>Add a login</h3>
+        <label className="field"><span>Name</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ravi" /></label>
+        <label className="field"><span>Username</span><input className="input" required autoCapitalize="none" pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{2,39}" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ravi.amara" /></label>
+        <label className="field"><span>Password (min 8 characters)</span><input className="input" required minLength={8} type="text" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
         <label className="field"><span>Role</span>
           <select className="input" value={role} onChange={(e) => setRole(e.target.value as Role)}>
             <option value="staff">Stylist: runs consultations</option>
             <option value="owner">Owner: also manages branding, styles and team</option>
           </select>
         </label>
-        <button className="btn btn-accent">Add member</button>
+        <button className="btn">Create login</button>
       </form>
     </div>
   );

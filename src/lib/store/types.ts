@@ -2,6 +2,13 @@ import type { AccessLog, Consent, Member, Result, Salon, ShareEvent, Style, TryO
 
 export type NewSalon = Pick<Salon, "slug" | "name"> & Partial<Omit<Salon, "id" | "slug" | "name" | "createdAt">>;
 
+export interface MemberAuth {
+  member: Member;
+  passwordHash: string;
+}
+
+export class DuplicateError extends Error {}
+
 export interface UsageStats {
   sessions: number;
   tryOns: number;
@@ -10,7 +17,7 @@ export interface UsageStats {
   shareEvents: number;
 }
 
-/** Data access. Two implementations: in-memory (demo) and Supabase. */
+/** Data access. Two implementations: in-memory (demo) and Postgres (self-hosted). */
 export interface Store {
   // salons
   getSalon(id: string): Promise<Salon | null>;
@@ -18,13 +25,18 @@ export interface Store {
   listSalons(): Promise<Salon[]>;
   createSalon(input: NewSalon): Promise<Salon>;
   updateSalon(id: string, patch: Partial<Omit<Salon, "id" | "createdAt">>): Promise<Salon>;
-  reserveCredits(salonId: string, count: number): Promise<boolean>;
-  refundCredits(salonId: string, count: number): Promise<void>;
+  /** Atomically spend credits if the balance allows it. */
+  reserveCredits(salonId: string, credits: number): Promise<boolean>;
+  refundCredits(salonId: string, credits: number): Promise<void>;
+  /** Add (or with a negative delta remove) granted credits; never below 0. */
+  adjustCredits(salonId: string, delta: number): Promise<Salon>;
 
   // members
   listMembers(salonId: string): Promise<Member[]>;
-  membershipsForEmail(email: string): Promise<Member[]>;
-  addMember(input: Omit<Member, "id" | "createdAt">): Promise<Member>;
+  getMemberAuth(by: { id: string } | { username: string }): Promise<MemberAuth | null>;
+  /** Throws DuplicateError if the username is taken. */
+  addMember(input: Omit<Member, "id" | "createdAt"> & { passwordHash: string }): Promise<Member>;
+  setMemberPassword(memberId: string, passwordHash: string): Promise<void>;
   removeMember(salonId: string, memberId: string): Promise<void>;
 
   // styles

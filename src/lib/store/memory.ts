@@ -1,11 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { CATALOGUE } from "../styles/catalogue";
 import type { AccessLog, Consent, Member, Result, Salon, ShareEvent, Style, TryOnSession } from "../types";
-import type { NewSalon, Store, UsageStats } from "./types";
+import { hashPasswordSync } from "../password";
+import { DuplicateError, type NewSalon, type Store, type UsageStats } from "./types";
+
+/** Demo logins (demo mode only). */
+export const DEMO_USERS = [
+  { username: "demo-owner", password: "tryitnow", role: "owner", name: "Amara (Owner)" },
+  { username: "demo-stylist", password: "tryitnow", role: "staff", name: "Ravi" },
+] as const;
 
 interface DB {
   salons: Map<string, Salon>;
-  members: Map<string, Member>;
+  members: Map<string, Member & { passwordHash: string }>;
   styles: Map<string, Style>;
   sessions: Map<string, TryOnSession>;
   consents: Map<string, Consent>;
@@ -24,12 +31,12 @@ function seed(): DB {
   const salon: Salon = {
     id: randomUUID(), slug: "demo", name: "Studio Amara", logoUrl: null, accentColor: "#b08d57",
     bookingUrl: "https://example.com/book", whatsappNumber: "919800000000", city: "Bengaluru",
-    plan: "pilot", creditsTotal: 100, creditsUsed: 0, periodStart: now(), active: true,
+    creditsTotal: 1000, creditsUsed: 0, active: true,
     disabledStyleIds: [], createdAt: now(),
   };
   db.salons.set(salon.id, salon);
-  for (const [email, role, name] of [["owner@demo.salon", "owner", "Amara (Owner)"], ["staff@demo.salon", "staff", "Ravi"]] as const) {
-    const m: Member = { id: randomUUID(), salonId: salon.id, email, role, name, createdAt: now() };
+  for (const u of DEMO_USERS) {
+    const m = { id: randomUUID(), salonId: salon.id, username: u.username, role: u.role, name: u.name, createdAt: now(), passwordHash: hashPasswordSync(u.password) };
     db.members.set(m.id, m);
   }
   CATALOGUE.forEach((c, i) => {
@@ -38,8 +45,9 @@ function seed(): DB {
   return db;
 }
 
-const g = globalThis as unknown as { __keshkalaDb?: DB };
-const db = (g.__keshkalaDb ??= seed());
+const g = globalThis as unknown as { __tbycDb?: DB };
+const db = (g.__tbycDb ??= seed());
+const pub = ({ passwordHash: _p, ...m }: Member & { passwordHash: string }): Member => m;
 
 function mustGet<T>(map: Map<string, T>, id: string, what: string): T {
   const v = map.get(id);
@@ -54,8 +62,8 @@ export const memoryStore: Store = {
   async createSalon(input: NewSalon) {
     if ([...db.salons.values()].some((s) => s.slug === input.slug)) throw new Error("slug already in use");
     const s: Salon = {
-      logoUrl: null, accentColor: "#b08d57", bookingUrl: null, whatsappNumber: null, city: null,
-      plan: "pilot", creditsTotal: 100, creditsUsed: 0, periodStart: now(), active: true, disabledStyleIds: [],
+      logoUrl: null, accentColor: "#c49a5a", bookingUrl: null, whatsappNumber: null, city: null,
+      creditsTotal: 0, creditsUsed: 0, active: true, disabledStyleIds: [],
       ...input, id: randomUUID(), createdAt: now(),
     };
     db.salons.set(s.id, s);
@@ -66,25 +74,37 @@ export const memoryStore: Store = {
     db.salons.set(id, s);
     return s;
   },
-  async reserveCredits(salonId, count) {
+  async reserveCredits(salonId, credits) {
     const s = db.salons.get(salonId);
-    if (!s || !s.active || s.creditsUsed + count > s.creditsTotal) return false;
-    s.creditsUsed += count;
+    if (!s || !s.active || s.creditsUsed + credits > s.creditsTotal) return false;
+    s.creditsUsed += credits;
     return true;
   },
-  async refundCredits(salonId, count) {
+  async refundCredits(salonId, credits) {
     const s = db.salons.get(salonId);
-    if (s) s.creditsUsed = Math.max(0, s.creditsUsed - count);
+    if (s) s.creditsUsed = Math.max(0, s.creditsUsed - credits);
+  },
+  async adjustCredits(salonId, delta) {
+    const s = mustGet(db.salons, salonId, "salon");
+    s.creditsTotal = Math.max(0, s.creditsTotal + delta);
+    return s;
   },
 
-  async listMembers(salonId) { return [...db.members.values()].filter((m) => m.salonId === salonId); },
-  async membershipsForEmail(email) { return [...db.members.values()].filter((m) => m.email === email.toLowerCase()); },
+  async listMembers(salonId) { return [...db.members.values()].filter((m) => m.salonId === salonId).map(pub); },
+  async getMemberAuth(by) {
+    const m = "id" in by ? db.members.get(by.id) : [...db.members.values()].find((x) => x.username === by.username.toLowerCase());
+    return m ? { member: pub(m), passwordHash: m.passwordHash } : null;
+  },
   async addMember(input) {
-    const existing = [...db.members.values()].find((m) => m.salonId === input.salonId && m.email === input.email);
-    if (existing) return existing;
-    const m: Member = { ...input, id: randomUUID(), createdAt: now() };
+    const username = input.username.toLowerCase();
+    if ([...db.members.values()].some((m) => m.username === username)) throw new DuplicateError("username taken");
+    const m = { ...input, username, id: randomUUID(), createdAt: now() };
     db.members.set(m.id, m);
-    return m;
+    return pub(m);
+  },
+  async setMemberPassword(memberId, passwordHash) {
+    const m = db.members.get(memberId);
+    if (m) m.passwordHash = passwordHash;
   },
   async removeMember(salonId, memberId) {
     const m = db.members.get(memberId);

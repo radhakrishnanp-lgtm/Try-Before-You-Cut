@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { StyleArt } from "@/components/StyleArt";
+import { Tilt } from "@/components/fx/Tilt";
 import type { Gender, Length, Texture } from "@/lib/types";
 import type { PublicStyle } from "./types";
 
@@ -46,7 +47,7 @@ export function StylePicker(props: {
       <div className="flow-head spread">
         <div>
           <div className="eyebrow">Step 2 of 3</div>
-          <h1 style={{ marginBottom: 4 }}>Choose up to four looks</h1>
+          <h1 style={{ marginBottom: 4 }}>Choose up to <em>four</em> looks</h1>
           <p className="muted" style={{ margin: 0 }}>We'll create them at the same time. You can always try more afterwards.</p>
         </div>
         {props.hasResults && <button className="btn btn-ghost btn-sm" onClick={props.onBack}>Back to my looks</button>}
@@ -83,7 +84,7 @@ export function StylePicker(props: {
         {visible.map((s) => {
           const on = selected.includes(s.id);
           return (
-            <button key={s.id} className="style-card" aria-pressed={on} onClick={() => toggle(s.id)} disabled={!on && selected.length >= MAX}>
+            <Tilt as="button" max={10} key={s.id} className="style-card" aria-pressed={on} onClick={() => toggle(s.id)} disabled={!on && selected.length >= MAX}>
               <div className="style-art">
                 {s.referenceImageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -98,7 +99,7 @@ export function StylePicker(props: {
                 <p>{s.description}</p>
                 {tried.has(s.id) && <span className="badge" style={{ marginTop: 8 }}>Tried</span>}
               </div>
-            </button>
+            </Tilt>
           );
         })}
         {visible.length === 0 && <p className="muted">No styles match these filters.</p>}

@@ -12,15 +12,17 @@ function env(name: string): string | undefined {
 }
 
 export const config = {
-  appUrl: env("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000",
+  // Read at runtime (never inlined at build), so one Docker image works for any domain.
+  appUrl: (env("APP_URL") ?? env("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000").replace(/\/$/, ""),
   appSecret: env("APP_SECRET") ?? "dev-insecure-secret-change-me",
-  platformAdmins: (env("PLATFORM_ADMIN_EMAILS") ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean),
-  supabaseUrl: env("NEXT_PUBLIC_SUPABASE_URL"),
-  supabaseAnonKey: env("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
-  supabaseServiceKey: env("SUPABASE_SERVICE_ROLE_KEY"),
+  // Platform admin login (you). Use ADMIN_PASSWORD_HASH from `npm run hash-password` in production.
+  adminUsername: (env("ADMIN_USERNAME") ?? "admin").toLowerCase(),
+  adminPassword: env("ADMIN_PASSWORD"),
+  adminPasswordHash: env("ADMIN_PASSWORD_HASH"),
+  databaseUrl: env("DATABASE_URL"),
+  storageDir: env("STORAGE_DIR") ?? "./storage",
+  /** Credits charged per generated look (refunded if the look fails). */
+  creditsPerImage: Math.max(1, Number(env("CREDITS_PER_IMAGE") ?? "10")),
   aiProviders: (env("AI_PROVIDERS") ?? "magnific,gemini,flux").split(",").map((s) => s.trim()).filter(Boolean),
   geminiKey: env("GEMINI_API_KEY"),
   geminiModel: env("GEMINI_IMAGE_MODEL") ?? "gemini-2.5-flash-image",
@@ -37,7 +39,10 @@ export const config = {
   // Magnific (Freepik) MCP: image generation
   magnificUrl: env("MAGNIFIC_MCP_URL") ?? "https://mcp.magnific.com",
   magnificToken: env("MAGNIFIC_MCP_TOKEN"),
-  magnificImageModel: env("MAGNIFIC_IMAGE_MODEL") ?? "imagen-nano-banana-2-lite",
+  magnificImageModel: env("MAGNIFIC_IMAGE_MODEL") ?? "imagen-nano-banana-2-1",
+  magnificResolution: env("MAGNIFIC_RESOLUTION") ?? "2k",
+  /** Portrait output for consultations. "auto" keeps the photo's own ratio. */
+  magnificAspectRatio: env("MAGNIFIC_ASPECT_RATIO") ?? "3:4",
   magnificParentFolder: env("MAGNIFIC_PARENT_FOLDER"),
   faceServiceUrl: env("FACE_SERVICE_URL"),
   faceServiceToken: env("FACE_SERVICE_TOKEN"),
@@ -45,11 +50,5 @@ export const config = {
   cronSecret: env("CRON_SECRET"),
 };
 
-/** Demo mode = no Supabase configured. Uses in-memory data and mock AI. */
-export const isDemo = !(config.supabaseUrl && config.supabaseAnonKey && config.supabaseServiceKey);
-
-export function isPlatformAdmin(email: string | null | undefined): boolean {
-  if (!email) return false;
-  if (isDemo && email.toLowerCase() === "admin@demo.salon") return true;
-  return config.platformAdmins.includes(email.toLowerCase());
-}
+/** Demo mode = no DATABASE_URL. In-memory data, demo logins, mock AI unless keys are set. */
+export const isDemo = !config.databaseUrl;

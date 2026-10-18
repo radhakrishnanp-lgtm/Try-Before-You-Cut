@@ -1,4 +1,5 @@
 "use client";
+import { Tilt } from "@/components/fx/Tilt";
 import { AI_DISCLAIMER } from "@/lib/copy";
 import type { PublicStyle, ResultView, SessionView } from "./types";
 
@@ -22,7 +23,7 @@ export function Results({ view, styles, chosen, onToggleChosen, onOpen, onMore, 
       <div className="flow-head spread">
         <div>
           <div className="eyebrow">Step 3 of 3</div>
-          <h1 style={{ marginBottom: 4 }}>{pending > 0 ? "Creating your looks…" : "Your looks"}</h1>
+          <h1 style={{ marginBottom: 4 }}>{pending > 0 ? <>Creating your <em>looks</em>…</> : <>Your <em>looks</em></>}</h1>
           <p className="muted" style={{ margin: 0 }}>
             {pending > 0 ? `${pending} still styling. Each appears as soon as it's ready.` : "Tap a look to compare it with your photo. Tap ♡ to shortlist for your Stylist Board."}
           </p>
@@ -71,7 +72,7 @@ function ResultCard({ r, style, photo, chosen, onToggle, onOpen }: {
 }) {
   const name = style?.name ?? "Look";
   return (
-    <div className="result-card">
+    <Tilt className="result-card" max={r.status === "ready" ? 8 : 3}>
       {r.status === "ready" && (
         <button className="heart" aria-pressed={chosen} aria-label={chosen ? `Remove ${name} from board` : `Add ${name} to board`} onClick={onToggle}>
           {chosen ? "♥" : "♡"}
@@ -108,6 +109,6 @@ function ResultCard({ r, style, photo, chosen, onToggle, onOpen }: {
         <h3>{name}</h3>
         {r.status === "ready" && r.similarity !== null && r.provider !== "mock" && <span className="badge badge-ok" title="Identity check passed">Likeness ✓</span>}
       </div>
-    </div>
+    </Tilt>
   );
 }

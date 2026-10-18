@@ -103,7 +103,7 @@ await page.locator(".toggle-item input").first().uncheck();
 await page.getByRole("button", { name: "Save changes" }).click();
 await page.getByText("Saved").waitFor();
 await page.getByRole("tab", { name: "Branding" }).click();
-await page.getByLabel("Use #2f5d50").click();
+await page.getByLabel("Use #6fae95").click();
 await page.waitForTimeout(500);
 await page.screenshot({ path: SP + "/12-branding.png", fullPage: true });
 await page.goto(BASE + "/studio");

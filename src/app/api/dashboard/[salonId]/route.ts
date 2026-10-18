@@ -2,7 +2,6 @@ import { z } from "zod";
 import { HttpError, requireMember } from "@/lib/auth";
 import { handler, json } from "@/lib/http";
 import { store } from "@/lib/store";
-import { PLANS } from "@/lib/types";
 
 type Ctx = { params: Promise<{ salonId: string }> };
 
@@ -22,6 +21,5 @@ export const PATCH = handler(async (req: Request, { params }: Ctx) => {
   const salon = await store.getSalon(salonId);
   if (!salon) throw new HttpError(404, "Salon not found");
   const body = Patch.parse(await req.json());
-  if (body.accentColor && !PLANS[salon.plan].branding) throw new HttpError(402, "Custom colours are part of the Pro plan.");
   return json({ salon: await store.updateSalon(salonId, body) });
 });

@@ -1,21 +1,23 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/SiteHeader";
 import { CONSENT_VERSION, RETENTION_HOURS } from "@/lib/config";
-import { GRIEVANCE_EMAIL } from "@/lib/legal";
+import { grievanceEmail } from "@/lib/legal";
 
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Privacy policy" };
 
 export default function Privacy() {
+  const GRIEVANCE_EMAIL = grievanceEmail();
   return (
     <>
       <SiteHeader />
       <main className="narrow flow prose">
         <div className="eyebrow">Notice version {CONSENT_VERSION}</div>
         <h1>Privacy policy</h1>
-        <p className="muted">This policy explains how Keshkala and the salons that use it handle your photo under India's Digital Personal Data Protection Act, 2023 and the DPDP Rules, 2025. <em>Draft for legal review before launch.</em></p>
+        <p className="muted">This policy explains how Try-Before-You-Cut and the salons that use it handle your photo under India's Digital Personal Data Protection Act, 2023 and the DPDP Rules, 2025. <em>Draft for legal review before launch.</em></p>
 
         <h2>Who is responsible</h2>
-        <p>The salon you are visiting decides to offer the hairstyle preview and is the <strong>Data Fiduciary</strong>. Keshkala runs the software on the salon's behalf as a <strong>Data Processor</strong>. Our contract with each salon limits use of your data to the purpose below.</p>
+        <p>The salon you are visiting decides to offer the hairstyle preview and is the <strong>Data Fiduciary</strong>. Try-Before-You-Cut runs the software on the salon's behalf as a <strong>Data Processor</strong>. Our contract with each salon limits use of your data to the purpose below.</p>
 
         <h2>What we collect</h2>
         <ul>

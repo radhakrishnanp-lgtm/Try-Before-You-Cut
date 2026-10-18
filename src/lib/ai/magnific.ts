@@ -33,7 +33,7 @@ const first = (obj: unknown, keys: string[]) => findStrings(obj, keys)[0];
 
 export async function createSessionFolder(sessionId: string): Promise<string> {
   const res = await callTool("folders_create", {
-    name: `keshkala-${new Date().toISOString().slice(0, 10)}-${sessionId.slice(0, 8)}`,
+    name: `tbyc-${new Date().toISOString().slice(0, 10)}-${sessionId.slice(0, 8)}`,
     ...(config.magnificParentFolder ? { parentReference: config.magnificParentFolder } : {}),
   });
   const ref = first(res, ["reference", "folderReference"]);
@@ -109,7 +109,8 @@ export const magnificProvider: ImageEditProvider = {
       prompt: req.prompt,
       mode: config.magnificImageModel,
       references: [{ type: "image", identifier: photo }],
-      aspectRatio: nearestRatio(req.image),
+      aspectRatio: config.magnificAspectRatio === "auto" ? nearestRatio(req.image) : config.magnificAspectRatio,
+      ...(config.magnificResolution ? { resolution: config.magnificResolution } : {}),
       count: 1,
       folderReference: state.folder,
     });
